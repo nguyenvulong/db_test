@@ -1,0 +1,43 @@
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb_container
+    ports:
+      - "3306:3306"
+    env_file:
+      - .env
+    volumes:
+      - ./dbdata:/var/lib/mysql
+      - ./:/docker-entrypoint-initdb.d/
+    networks:
+      - maria_net
+
+  container1:
+    build: .
+    volumes:
+      - ./results:/output
+    env_file:
+      - .env
+    environment:
+      - CONTAINER_ID=container1
+    networks:
+      - maria_net
+    depends_on:
+      - mariadb
+
+  container2:
+    build: .
+    volumes:
+      - ./results:/output
+    env_file:
+      - .env
+    environment:
+      - CONTAINER_ID=container2
+    networks:
+      - maria_net
+    depends_on:
+      - mariadb
+
+networks:
+  maria_net:
+    name: maria_net
