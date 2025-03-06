@@ -20,7 +20,7 @@ DELIMITER //
 CREATE PROCEDURE generate_sample_data()
 BEGIN
     DECLARE i INT DEFAULT 0;
-    WHILE i < 100 DO
+    WHILE i < 500 DO
         INSERT INTO tasks (task_name, task_description, priority)
         VALUES (
             CONCAT('Task_', i),

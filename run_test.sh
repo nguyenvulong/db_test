@@ -2,10 +2,10 @@
 
 # Load environment variables from .env file
 if [ -f .env ]; then
-    source .env
+  source .env
 else
-    echo "Error: .env file not found"
-    exit 1
+  echo "Error: .env file not found"
+  exit 1
 fi
 
 # Create directories, make sure to remove previous `results`
@@ -18,12 +18,12 @@ docker compose up -d mariadb
 # Wait for MariaDB to be ready
 echo "Waiting for MariaDB to be ready..."
 until docker exec mariadb_container mariadb -u"${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" >/dev/null 2>&1; do
-    echo "MariaDB is unavailable - sleeping"
-    sleep 1
+  echo "MariaDB is unavailable - sleeping"
+  sleep 1
 done
 
 echo "MariaDB is up - initializing database"
-docker exec -i mariadb_container mariadb -u"${DB_USER}" -p"${DB_PASS}" < setup.sql
+docker exec -i mariadb_container mariadb -u"${DB_USER}" -p"${DB_PASS}" <setup.sql
 
 # Verify the database was initialized correctly
 echo "Verifying database initialization..."
@@ -41,4 +41,4 @@ echo "Running analysis script..."
 python analyze_results.py
 
 # Clean up
-docker compose down
+docker compose down --volume
