@@ -1,42 +1,65 @@
--- Create database if not exists
-CREATE DATABASE IF NOT EXISTS testdb;
-USE testdb;
-
--- Create tasks table if not exists
-CREATE TABLE IF NOT EXISTS tasks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    task_name VARCHAR(255) NOT NULL,
-    task_description TEXT,
-    priority INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    selected BOOLEAN DEFAULT FALSE
-);
-
--- Clear existing data if needed
-TRUNCATE TABLE tasks;
-
--- Generate 100,000 sample records
-DELIMITER //
-CREATE PROCEDURE generate_sample_data()
+-- Master-only initialization
+DO $$
 BEGIN
-    DECLARE i INT DEFAULT 0;
-    WHILE i < 500 DO
-        INSERT INTO tasks (task_name, task_description, priority)
-        VALUES (
-            CONCAT('Task_', i),
-            CONCAT('Description for task ', i, '. This is a synthetic task for testing concurrency.'),
-            FLOOR(1 + RAND() * 5)
-        );
-        SET i = i + 1;
-    END WHILE;
-END //
-DELIMITER ;
+  -- Only execute on master
+  IF EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = pg_backend_pid() AND client_addr IS NULL) THEN
+    -- Set wal_level to logical
+    ALTER SYSTEM SET wal_level = logical;
 
--- Execute the procedure
-CALL generate_sample_data();
+    -- Create dblink extension with proper permissions
+    CREATE EXTENSION IF NOT EXISTS dblink WITH SCHEMA public;
+    
+    -- Create replication role
+    CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD 'replicator123';
+    GRANT USAGE ON SCHEMA public TO replicator;
+    GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO replicator;
 
--- Drop the procedure
-DROP PROCEDURE generate_sample_data;
+    -- Create sample table if not exists
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
--- Verify
-SELECT COUNT(*) FROM tasks;
+    -- Insert initial data if table is empty
+    INSERT INTO users (name, email)
+    SELECT 'Alice', 'alice@example.com'
+    WHERE NOT EXISTS (SELECT 1 FROM users);
+
+    INSERT INTO users (name, email)
+    SELECT 'Bob', 'bob@example.com'
+    WHERE NOT EXISTS (SELECT 1 FROM users);
+
+    -- Verify initial data
+    SELECT * FROM users;
+
+    -- Create replication slot if not exists
+    PERFORM * FROM pg_create_physical_replication_slot('replica_slot', true);
+
+    -- Create publication
+    CREATE PUBLICATION my_publication FOR ALL TABLES;
+
+    -- Function to verify replication
+    CREATE OR REPLACE FUNCTION verify_replication() 
+    RETURNS TABLE (master_count BIGINT, replica_count BIGINT) 
+    AS $$
+    DECLARE
+        conn TEXT := 'host=postgres-replica dbname=demo_db user=admin password=admin123';
+    BEGIN
+        -- Get count from master
+        master_count := (SELECT COUNT(*) FROM users);
+        
+        -- Connect to replica and get count
+        PERFORM dblink_connect('replica_conn', conn);
+        RETURN QUERY
+        SELECT master_count, COUNT(*)::BIGINT AS replica_count
+        FROM dblink('replica_conn', 'SELECT * FROM users') AS t1(id INT, name TEXT, email TEXT, created_at TIMESTAMP);
+        PERFORM dblink_disconnect('replica_conn');
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Verify replication status
+    SELECT * FROM verify_replication();
+  END IF;
+END $$;

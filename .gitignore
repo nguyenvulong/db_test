@@ -1,4 +1,13 @@
+# Ignore environment files
 .env
-.venv
-dbdata
-results
+
+# Ignore editor files
+.vscode/
+.idea/
+
+# Ignore database data
+pg-master-data/
+pg-replica-data/
+
+dbdata/
+results/
