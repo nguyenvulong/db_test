@@ -23,13 +23,9 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Insert initial data if table is empty
 INSERT INTO users (name, email)
-SELECT 'Alice', 'alice@example.com'
-WHERE NOT EXISTS (SELECT 1 FROM users);
-
+SELECT 'Alice', 'alice@example.com';
 INSERT INTO users (name, email)
-SELECT 'Bob', 'bob@example.com'
-WHERE NOT EXISTS (SELECT 1 FROM users);
-
+SELECT 'Bob', 'bob@example.com';
 -- Verify initial data
 SELECT * FROM users;
 

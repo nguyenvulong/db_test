@@ -23,7 +23,8 @@ The setup uses PostgreSQL's logical replication feature to synchronize data betw
 ├── docker-compose.yml      # Docker Compose configuration
 ├── .env                    # Environment variables
 ├── pg_hba.conf             # PostgreSQL host-based authentication configuration
-├── setup.sql               # SQL setup script for both master and replica databases
+├── setup-master.sql        # SQL setup script for master database
+├── setup-replica.sql       # SQL setup script for replica database
 ├── run_test.sh             # Main script to run the experiment
 └── test_script.sh          # Test script to verify replication
 ```
@@ -40,12 +41,12 @@ The `docker-compose.yml` file defines two PostgreSQL services:
      - `wal_level=logical`
      - `max_replication_slots=10`
      - `max_wal_senders=10`
-   - Uses `setup.sql` for initialization
+   - Uses `setup-master.sql` for initialization
    - Uses custom `pg_hba.conf` for authentication
 
 2. **postgres-replica**:
    - Runs on port 5433
-   - Uses `setup.sql` for initialization
+   - Uses `setup-replica.sql` for initialization
    - Depends on the master database being healthy
 
 ### Environment Variables
@@ -63,18 +64,18 @@ POSTGRES_REPLICA_PORT=5433
 
 ## Replication Setup
 
-The replication is set up through the unified initialization script:
+The replication is set up through the initialization scripts:
 
-The `setup.sql` script:
-- Contains conditional logic to detect whether it's running on the master or replica
-- On the master:
-  - Sets system parameters for logical replication
-  - Creates a `replicator` role with appropriate permissions
-  - Creates a sample `users` table with initial data (Alice and Bob)
-  - Creates a publication `my_publication` for all tables
-  - Creates a `verify_replication()` function that uses dblink to check if data is synchronized
-- On the replica:
-  - Creates a subscription `my_subscription` to the master's publication
+1. `setup-master.sql`:
+   - Sets system parameters for logical replication
+   - Creates a `replicator` role with appropriate permissions
+   - Creates a sample `users` table with initial data (Alice and Bob)
+   - Creates a publication `my_publication` for all tables
+   - Creates a `verify_replication()` function that uses dblink to check if data is synchronized
+
+2. `setup-replica.sql`:
+   - Creates the same `users` table structure
+   - Creates a subscription `my_subscription` to the master's publication
 
 ### Host-Based Authentication Configuration
 
@@ -141,7 +142,7 @@ The `test_script.sh` script loads environment variables from `.env` and performs
 
 ## Verification Function
 
-The `verify_replication()` function in `setup.sql` is used throughout the tests to check if the data in the master and replica databases is synchronized. This function:
+The `verify_replication()` function in `setup-master.sql` is used throughout the tests to check if the data in the master and replica databases is synchronized. This function:
 
 1. Uses the `dblink` extension to connect to the replica database
 2. Counts the number of records in the `users` table on both the master and replica
