@@ -1,4 +1,4 @@
-# Test Runner Project
+# MariaDB Transaction Experiment
 
 This project provides an automated test environment using Docker containers with MariaDB as the database backend.
 
